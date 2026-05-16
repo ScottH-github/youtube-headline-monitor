@@ -1,0 +1,5 @@
+.env
+output/
+deploy/
+venv/
+__pycache__/
