@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  headline-monitor:
+    build: .
+    container_name: youtube-headline-monitor
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Taipei
+      - PYTHONUNBUFFERED=1
+      - GIT_AUTHOR_NAME=Scott
+      - GIT_AUTHOR_EMAIL=scott@headline-monitor
+      - GIT_COMMITTER_NAME=Scott
+      - GIT_COMMITTER_EMAIL=scott@headline-monitor
+    volumes:
+      - ./output:/app/output
+      - ./deploy:/app/deploy
+    command: >
+      python3 main.py
+      "https://www.youtube.com/live/AEBeWMM1atA?si=2FK3jfOGq9CpOa5C"
