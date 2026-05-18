@@ -45,6 +45,9 @@ def main():
     config.HEADLINES_DIR = f"{args.output}/headlines"
     config.DB_PATH = f"{args.output}/headlines.db"
 
+    # 每次啟動清空前次資料，確保每日報告獨立
+    _clean_output(args.output)
+
     print("=" * 60)
     print("  YouTube 直播新聞頭條擷取")
     print("=" * 60)
@@ -170,6 +173,22 @@ def main():
         deploy_report(report_path)
     else:
         print("[完成] 無新頭條，跳過部署")
+
+
+def _clean_output(output_dir: str):
+    """清空 output 目錄，確保每日報告獨立"""
+    import shutil
+    for sub in ["frames", "headlines"]:
+        sub_dir = os.path.join(output_dir, sub)
+        if os.path.exists(sub_dir):
+            shutil.rmtree(sub_dir)
+    db_path = os.path.join(output_dir, "headlines.db")
+    if os.path.exists(db_path):
+        os.remove(db_path)
+    report_path = os.path.join(output_dir, "report.html")
+    if os.path.exists(report_path):
+        os.remove(report_path)
+    print("[主程式] 已清空前次資料")
 
 
 if __name__ == "__main__":
