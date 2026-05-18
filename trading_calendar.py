@@ -8,6 +8,8 @@ import urllib.error
 from datetime import datetime
 
 
+# 本地行事曆（每年底從政府 data.gov.tw 下載 CSV 更新）
+# 資料來源：https://data.gov.tw/dataset/14718
 HOLIDAYS_PATH = os.environ.get("HOLIDAYS_JSON_PATH", "holidays.json")
 
 # 行政院人事行政總處停班停課查詢頁面
@@ -18,6 +20,8 @@ def is_trading_day(today: datetime = None) -> tuple[bool, str]:
     """判斷是否為交易日，回傳 (是否開盤, 原因)
 
     優先順序：補班日(開盤) > 休市日(休市) > 週六日(休市) > 颱風假(休市) > 正常開盤
+
+    holidays.json 資料來源為政府行政機關辦公日曆表，每年底更新一次。
     """
     if today is None:
         today = datetime.now()
@@ -26,7 +30,6 @@ def is_trading_day(today: datetime = None) -> tuple[bool, str]:
     mmdd = today.strftime("%m-%d")
     weekday = today.weekday()  # 0=Mon, 6=Sun
 
-    # 讀取 holidays.json
     holidays, makeup_days = _load_calendar(year)
 
     # 1. 補班日 → 開盤
@@ -83,16 +86,10 @@ def _check_typhoon_day() -> tuple[bool, str]:
         with resp:
             html = resp.read().decode("utf-8")
 
-        # 頁面包含「無停班停課訊息」表示正常上班
         if "無停班停課訊息" in html:
             return False, ""
-
-        # 檢查台北市是否停班（頁面會列出各縣市停班狀態）
-        if "臺北市" in html and "停止上班" in html:
+        if ("臺北市" in html or "台北市" in html) and "停止上班" in html:
             return True, "台北市停班停課"
-        if "台北市" in html and "停止上班" in html:
-            return True, "台北市停班停課"
-
         return False, ""
     except Exception as e:
         print(f"[交易日曆] 停班停課查詢失敗: {e}（預設正常執行）")
