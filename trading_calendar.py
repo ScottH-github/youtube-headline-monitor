@@ -2,6 +2,7 @@
 
 import json
 import os
+import ssl
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -9,8 +10,8 @@ from datetime import datetime
 
 HOLIDAYS_PATH = os.environ.get("HOLIDAYS_JSON_PATH", "holidays.json")
 
-# 行政院人事行政總處停班停課 API
-TYPHOON_API_URL = "https://www.dgpa.gov.tw/api/typh"
+# 行政院人事行政總處停班停課查詢頁面
+TYPHOON_URL = "https://www.dgpa.gov.tw/typh/daily/nds.html"
 
 
 def is_trading_day(today: datetime = None) -> tuple[bool, str]:
@@ -68,29 +69,33 @@ def _load_calendar(year: str) -> tuple[set, set]:
 
 
 def _check_typhoon_day() -> tuple[bool, str]:
-    """查詢停班停課 API，檢查台北市是否停班
+    """查詢停班停課頁面，檢查台北市是否停班
 
-    API 失敗時預設回傳 False（正常執行）
+    查詢失敗時預設回傳 False（正常執行）
     """
     try:
-        req = urllib.request.Request(TYPHOON_API_URL, headers={"User-Agent": "headline-monitor/1.0"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        req = urllib.request.Request(TYPHOON_URL, headers={"User-Agent": "headline-monitor/1.0"})
+        try:
+            resp = urllib.request.urlopen(req, timeout=10)
+        except (ssl.SSLError, urllib.error.URLError):
+            ctx = ssl._create_unverified_context()
+            resp = urllib.request.urlopen(req, timeout=10, context=ctx)
+        with resp:
+            html = resp.read().decode("utf-8")
 
-        # API 回傳空陣列表示無停班停課
-        if not data:
+        # 頁面包含「無停班停課訊息」表示正常上班
+        if "無停班停課訊息" in html:
             return False, ""
 
-        # 搜尋台北市的停班資訊
-        for item in data:
-            city = item.get("city", "") or item.get("CITY", "")
-            is_work_off = item.get("isWorkOff", "") or item.get("IS_WORK_OFF", "")
-            if "台北" in city and is_work_off == "是":
-                return True, f"台北市停班 - {item.get('title', item.get('TITLE', ''))}"
+        # 檢查台北市是否停班（頁面會列出各縣市停班狀態）
+        if "臺北市" in html and "停止上班" in html:
+            return True, "台北市停班停課"
+        if "台北市" in html and "停止上班" in html:
+            return True, "台北市停班停課"
 
         return False, ""
     except Exception as e:
-        print(f"[交易日曆] 停班停課 API 查詢失敗: {e}（預設正常執行）")
+        print(f"[交易日曆] 停班停課查詢失敗: {e}（預設正常執行）")
         return False, ""
 
 
