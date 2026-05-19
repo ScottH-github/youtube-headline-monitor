@@ -25,16 +25,63 @@ def image_to_base64(path: str, max_width: int = 800, quality: int = 60) -> str:
         return ""
 
 
+def _is_noise(text: str, min_len: int = 10) -> bool:
+    """判斷 OCR 文字是否為雜訊（非新聞頭條）"""
+    import re
+    text = text.strip()
+
+    # 太短
+    if len(text) < min_len:
+        return True
+
+    # 無中文或英文字母（純數字/符號）
+    if not any(c.isalpha() or '\u4e00' <= c <= '\u9fff' for c in text):
+        return True
+
+    # JSON / 座標
+    if text.startswith("{") or text.startswith("[") or '"point"' in text:
+        return True
+
+    # LLM 拒絕/解釋訊息
+    llm_noise = [
+        "由於", "抱歉", "無法辨識", "解析度", "藝術化", "模糊",
+        "I cannot", "I can't", "sorry", "圖片中沒有", "看不清",
+        "沒有文字", "no text", "不包含文字",
+    ]
+    if any(p in text for p in llm_noise):
+        return True
+
+    # 廣告 / 贊助 / 節目宣傳
+    ad_patterns = [
+        "贊助播出", "贊助", "廣告", "諮詢專線", "0800", "免費專線",
+        "7-ELEVEN", "7-eleven", "統一布丁", "康利舒胃",
+        "本節目由", "感謝收看", "精彩內容",
+    ]
+    if any(p in text for p in ad_patterns):
+        return True
+
+    # 頻道 / 節目宣傳
+    promo_patterns = [
+        "頻道", "YouTube", "youtube", "訂閱", "按讚", "分享",
+        "小姐不熙娣", "綜合報導", "主播", "記者.*報導",
+    ]
+    if any(re.search(p, text) for p in promo_patterns):
+        return True
+
+    # 非新聞格式：沒有中文字超過 4 個字（頭條至少幾個中文字）
+    chinese_chars = re.findall(r'[\u4e00-\u9fff]', text)
+    if len(chinese_chars) < 4:
+        return True
+
+    return False
+
+
 def generate_report(output_path: str = "output/report.html"):
     """從 SQLite 產生 HTML 報告"""
     store = Storage()
     records = store.get_all_records()
     store.close()
 
-    noise_keywords = [
-        "沒有文字", "no text", "諮詢專線", "0800", "7-ELEVEN", "7-eleven",
-        "統一布丁", "康利舒胃", "綜合報導", "主播",
-    ]
     min_text_len = 10
 
     rows_html = ""
@@ -42,11 +89,7 @@ def generate_report(output_path: str = "output/report.html"):
         frame_b64 = image_to_base64(r["frame_path"], max_width=480, quality=35)
         headline_b64 = image_to_base64(r["headline_path"], max_width=400, quality=40)
         text = r['ocr_text']
-        is_noise = (
-            len(text.strip()) < min_text_len
-            or any(kw in text for kw in noise_keywords)
-            or (not any(c.isalpha() or '\u4e00' <= c <= '\u9fff' for c in text))
-        )
+        is_noise = _is_noise(text, min_text_len)
         noise_cls = ' class="noise"' if is_noise else ''
         rows_html += f"""
         <tr{noise_cls}>
@@ -88,7 +131,8 @@ def generate_report(output_path: str = "output/report.html"):
     .filter-bar {{ text-align: center; margin-bottom: 15px; }}
     .filter-bar label {{ cursor: pointer; color: #aaa; font-size: 15px; }}
     .filter-bar input {{ margin-right: 6px; }}
-    tr.noise.hidden {{ display: none; }}
+    tr.noise {{ display: none; }}
+    tr.noise.show {{ display: table-row; }}
 </style>
 </head>
 <body>
@@ -96,7 +140,7 @@ def generate_report(output_path: str = "output/report.html"):
 <h1>新聞頭條擷取報告</h1>
 <p class="stats" id="stats">共 {len(records)} 則頭條</p>
 <div class="filter-bar">
-    <label><input type="checkbox" id="filterNoise" onchange="toggleNoise(this.checked)"> 過濾無效資料（廣告、太短、無文字）</label>
+    <label><input type="checkbox" id="filterNoise" checked onchange="toggleNoise(this.checked)"> 過濾無效資料（廣告、太短、無文字）</label>
 </div>
 <input type="text" class="search-box" placeholder="搜尋文字..." oninput="filterRows(this.value)">
 <table>
@@ -119,16 +163,19 @@ function filterRows(q) {{
 }}
 function toggleNoise(hide) {{
     document.querySelectorAll('tr.noise').forEach(r => {{
-        r.classList.toggle('hidden', hide);
+        r.classList.toggle('show', !hide);
     }});
     updateCount();
 }}
 function updateCount() {{
-    const total = document.querySelectorAll('#tbody tr').length;
-    const visible = document.querySelectorAll('#tbody tr:not([style*="display: none"]):not(.hidden)').length;
+    const rows = document.querySelectorAll('#tbody tr');
+    const total = rows.length;
+    let visible = 0;
+    rows.forEach(r => {{ if (r.offsetParent !== null || r.style.display === 'table-row') visible++; }});
     const el = document.getElementById('stats');
     el.textContent = visible < total ? '顯示 ' + visible + ' / ' + total + ' 則' : '共 ' + total + ' 則頭條';
 }}
+document.addEventListener('DOMContentLoaded', updateCount);
 function showModal(src) {{
     document.getElementById('modal-img').src = src;
     document.getElementById('modal').classList.add('active');

@@ -25,7 +25,7 @@ def ocr_headline(headline_crop: np.ndarray) -> str:
                 "content": [
                     {
                         "type": "text",
-                        "text": "請辨識圖片中的所有文字，只輸出辨識到的文字內容，不要加任何說明或格式。",
+                        "text": "這是一張新聞頭條截圖。請辨識圖片中的新聞標題文字，只輸出純文字內容。規則：1.只輸出新聞標題文字 2.不要輸出JSON、座標、說明 3.如果看不清楚就回覆空白 4.不要加引號或格式標記",
                     },
                     {
                         "type": "image_url",
@@ -45,7 +45,42 @@ def ocr_headline(headline_crop: np.ndarray) -> str:
         resp.raise_for_status()
         data = resp.json()
         content = data["choices"][0]["message"].get("content", "")
-        return content.strip()
+        return _clean_ocr_output(content)
     except Exception as e:
         print(f"[OCR] LLM 呼叫失敗: {e}")
         return ""
+
+
+def _clean_ocr_output(text: str) -> str:
+    """清理 LLM OCR 輸出，移除非文字內容"""
+    import re
+    text = text.strip()
+    if not text:
+        return ""
+
+    # 移除 thinking tags（Gemma 4 thinking mode）
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+
+    # 如果回傳 JSON → 丟棄
+    if text.startswith("{") or text.startswith("["):
+        return ""
+
+    # 如果是 LLM 拒絕/解釋訊息 → 丟棄
+    refusal_patterns = [
+        "由於", "抱歉", "無法辨識", "解析度", "藝術化", "模糊",
+        "I cannot", "I can't", "sorry", "unable to",
+        "圖片中沒有", "看不清", "不包含文字",
+    ]
+    first_line = text.split("\n")[0]
+    if any(p in first_line for p in refusal_patterns):
+        return ""
+
+    # 取第一行有意義的文字（LLM 有時多行解釋）
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    if lines:
+        text = lines[0]
+
+    # 移除常見包裹符號
+    text = text.strip('"\'「」『』【】')
+
+    return text.strip()
