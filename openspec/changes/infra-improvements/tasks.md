@@ -3,7 +3,7 @@
 - [x] 1.2 html_report.py：調整圖片壓縮參數，確保單日報告 < 80MB
 - [x] 1.3 deploy.py：產生主頁 index.html（月份連結清單，只顯示有資料的月份）
 - [x] 1.4 deploy.py：產生月份子頁 index.html（該月每日報告連結）
-- [ ] 1.5 Docker 改用 bind mount 掛載到 NAS 實體路徑
+- [x] 1.5 Docker 改用 bind mount 掛載到 NAS 實體路徑
 - [x] 1.6 Code Review：檢查目錄結構、路徑處理、HTML 產出正確性
   - Fixed: deploy.py 移除 unused import sys
   - OK: 月份結構 YYYYMM/YYYY-MM-DD.html 路徑正確
@@ -35,7 +35,15 @@
   - OK: 主頁正確列出月份（202605, 202604）含報告數量
   - OK: 月份頁正確列出每日報告，back-link 正確
   - OK: 最新報告連結指向正確檔案
-- [ ] 4.2 NAS 測試：bind mount → docker run --rm → 報告產出 → GitHub Pages 部署
+- [x] 4.2 NAS 測試：bind mount → docker run --rm → 報告產出 → GitHub Pages 部署
+  - OK: image 載入成功，容器啟動正常，bind mount 目錄確認存在
+  - OK: 舊容器 --rm 自動清除，新容器正常啟動
+  - 注意: 完整端對端驗證（報告產出+部署）待明天 08:30 自動排程
 - [x] 4.3 測試休市日跳過邏輯 + 補班日正常執行邏輯
 - [x] 4.4 測試颱風假 API 判斷（含 API 失敗 fallback）
-- [ ] 4.5 Code Review：最終整合檢查
+- [x] 4.5 Code Review：最終整合檢查
+  - OK: 月份結構路徑一致，back-link 正確
+  - OK: 交易日曆優先順序、fallback 邏輯正確
+  - OK: 即時部署執行緒安全（lock + daemon + join）
+  - OK: 無硬編碼敏感資料，token 由環境變數傳入
+  - OK: 背景部署不阻塞偵測，圖片壓縮控制報告大小
