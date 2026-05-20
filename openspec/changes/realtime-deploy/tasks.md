@@ -1,0 +1,11 @@
+## 1. 即時部署
+- [x] 1.1 main.py：每次 store.save() 後呼叫 generate_report + deploy_report
+- [x] 1.2 使用背景執行緒執行部署，避免阻塞偵測
+- [x] 1.3 加入 lock 防止多個部署同時執行
+- [x] 1.4 容器停止時仍保留最終一次部署（確保完整資料）
+- [x] 1.5 Code Review：檢查執行緒安全、部署失敗處理
+  - OK: deploy_lock 使用 non-blocking acquire，上一次未完成則跳過
+  - OK: daemon=True 確保主程式退出時執行緒不會阻塞
+  - OK: 退出前 join(timeout=120) 等待背景部署完成
+  - OK: 最終部署在 join 之後執行，確保包含所有資料
+  - OK: deploy_in_background 有 try/except 捕獲異常，不會影響主程式

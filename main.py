@@ -5,6 +5,7 @@ import os
 import time
 import signal
 import sys
+import threading
 from datetime import datetime
 
 # 抑制 ffmpeg/OpenCV 的 TLS 錯誤訊息
@@ -67,6 +68,22 @@ def main():
     store = Storage()
 
     running = True
+    deploy_lock = threading.Lock()
+    deploy_thread = None
+
+    def deploy_in_background():
+        """背景執行緒：產生報告並部署"""
+        if not deploy_lock.acquire(blocking=False):
+            print("[部署] 上一次部署尚未完成，跳過")
+            return
+        try:
+            report_path = f"{args.output}/report.html"
+            generate_report(report_path)
+            deploy_report(report_path)
+        except Exception as e:
+            print(f"[部署] 背景部署失敗: {e}")
+        finally:
+            deploy_lock.release()
 
     def on_exit(sig, frame):
         nonlocal running
@@ -157,19 +174,29 @@ def main():
         count += 1
         print(f"[儲存] #{record_id} | {ocr_text}")
 
-    # 結束：關閉預覽 + 產生 HTML 報告
+        # 即時部署：背景執行緒產生報告並推送
+        deploy_thread = threading.Thread(target=deploy_in_background, daemon=True)
+        deploy_thread.start()
+
+    # 結束：等待背景部署完成 + 最終部署
     if args.preview:
         cv2.destroyAllWindows()
     reader.release()
+
+    # 等待進行中的背景部署完成
+    if deploy_thread and deploy_thread.is_alive():
+        print("[主程式] 等待背景部署完成...")
+        deploy_thread.join(timeout=120)
+
+    # 最終部署（確保包含所有資料）
     report_path = f"{args.output}/report.html"
     generate_report(report_path)
     store.close()
     print(f"\n[完成] 共擷取 {count} 則頭條")
     print(f"[完成] HTML 報告: {report_path}")
 
-    # 自動部署到 GitHub Pages
     if count > 0:
-        print("[完成] 部署到 GitHub Pages...")
+        print("[完成] 最終部署到 GitHub Pages...")
         deploy_report(report_path)
     else:
         print("[完成] 無新頭條，跳過部署")
