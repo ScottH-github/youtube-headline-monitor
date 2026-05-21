@@ -3,3 +3,4 @@ output/
 deploy/
 venv/
 __pycache__/
+.claude/settings.local.json
