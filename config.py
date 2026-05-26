@@ -1,4 +1,5 @@
 """可調參數設定"""
+import os
 
 # YouTube 串流
 STREAM_QUALITY = "720p"  # 串流畫質
@@ -41,3 +42,7 @@ OUTPUT_DIR = "output"
 FRAMES_DIR = "output/frames"
 HEADLINES_DIR = "output/headlines"
 DB_PATH = "output/headlines.db"
+
+# Telegram 通知
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")

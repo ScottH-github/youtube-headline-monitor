@@ -44,6 +44,13 @@ class Storage:
         self.conn.commit()
         return cursor.lastrowid
 
+    def get_headline_path(self, record_id: int) -> str:
+        """取得指定記錄的頭條截圖路徑"""
+        row = self.conn.execute(
+            "SELECT headline_path FROM headlines WHERE id = ?", (record_id,)
+        ).fetchone()
+        return row[0] if row else ""
+
     def get_all_texts(self) -> list[str]:
         """取得所有歷史 OCR 文字（供去重比對）"""
         rows = self.conn.execute("SELECT ocr_text FROM headlines").fetchall()

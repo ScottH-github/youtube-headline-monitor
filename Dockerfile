@@ -10,8 +10,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY *.py .
-COPY holidays.json .
+COPY *.py ./
+COPY holidays.json ./
 
 RUN mkdir -p output/frames output/headlines output/debug
 

@@ -20,6 +20,7 @@ from ocr_engine import ocr_headline
 from storage import Storage
 from html_report import generate_report
 from deploy import deploy_report
+from telegram_notify import send_headline
 from trading_calendar import is_trading_day
 
 
@@ -70,9 +71,11 @@ def main():
     running = True
     deploy_lock = threading.Lock()
     deploy_thread = None
+    last_headline = None  # (ocr_text, headline_path)
 
     def deploy_in_background():
         """背景執行緒：產生報告並部署"""
+        nonlocal last_headline
         if not deploy_lock.acquire(blocking=False):
             print("[部署] 上一次部署尚未完成，跳過")
             return
@@ -80,6 +83,14 @@ def main():
             report_path = f"{args.output}/report.html"
             generate_report(report_path)
             deploy_report(report_path)
+            # Telegram 通知
+            if last_headline:
+                text, img_path = last_headline
+                today = datetime.now()
+                month_dir = today.strftime("%Y%m")
+                day_file = today.strftime("%Y-%m-%d") + ".html"
+                report_url = f"https://scotth-github.github.io/youtube-headline-monitor/{month_dir}/{day_file}"
+                send_headline(text, img_path, report_url)
         except Exception as e:
             print(f"[部署] 背景部署失敗: {e}")
         finally:
@@ -173,6 +184,7 @@ def main():
         record_id = store.save(frame, headline_crop, ocr_text)
         count += 1
         print(f"[儲存] #{record_id} | {ocr_text}")
+        last_headline = (ocr_text, store.get_headline_path(record_id))
 
         # 即時部署：背景執行緒產生報告並推送
         deploy_thread = threading.Thread(target=deploy_in_background, daemon=True)
