@@ -83,7 +83,8 @@ def main():
             report_path = f"{args.output}/report.html"
             generate_report(report_path)
             deploy_report(report_path)
-            # Telegram 通知
+            # 等待 GitHub Pages 部署完成後再發 Telegram
+            time.sleep(30)
             if last_headline:
                 text, img_path = last_headline
                 today = datetime.now()
