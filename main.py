@@ -14,7 +14,7 @@ os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
 import cv2
 import config
 from stream import StreamReader
-from detector import crop_roi, detect_yellow_region
+from detector import crop_headline_region, detect_headline
 from dedup import Deduplicator
 from ocr_engine import ocr_headline
 from storage import Storage
@@ -124,12 +124,12 @@ def main():
         do_detect = (now - last_detect_time) >= args.interval
 
         headline_crop = None
-        bbox = None
+        headline_color = None
 
         if do_detect:
             last_detect_time = now
-            roi = crop_roi(frame)
-            headline_crop, bbox = detect_yellow_region(roi)
+            region = crop_headline_region(frame)
+            headline_crop, headline_color = detect_headline(region)
 
             # debug 模式：每 30 秒存一張 debug 幀
             if args.debug:
@@ -137,22 +137,22 @@ def main():
                 if debug_count % 20 == 1:  # 每 20 次偵測（約 30 秒）存一張
                     ts = datetime.now().strftime("%H%M%S")
                     cv2.imwrite(f"{debug_dir}/debug_{ts}.png", frame)
-                    cv2.imwrite(f"{debug_dir}/debug_{ts}_roi.png", roi)
-                    detected = "YES" if headline_crop is not None else "NO"
+                    cv2.imwrite(f"{debug_dir}/debug_{ts}_region.png", region)
+                    detected = f"YES({headline_color})" if headline_crop is not None else "NO"
                     print(f"[debug] 存 debug 幀 #{debug_count} detected={detected}")
 
         # 預覽視窗
         if args.preview:
             display = frame.copy()
             h, w = frame.shape[:2]
-            roi_x1 = int(w * config.ROI_X_START)
-            cv2.rectangle(display, (roi_x1, 0), (w, h), (0, 255, 0), 1)
+            hx1 = int(w * config.HEADLINE_X_START)
+            hy1 = int(h * config.HEADLINE_Y_START)
+            hx2 = int(w * config.HEADLINE_X_END)
+            hy2 = int(h * config.HEADLINE_Y_END)
+            color = (0, 255, 255) if headline_crop is not None else (0, 255, 0)
+            cv2.rectangle(display, (hx1, hy1), (hx2, hy2), color, 2)
 
-            if headline_crop is not None:
-                bx, by, bw, bh = bbox
-                cv2.rectangle(display, (roi_x1 + bx, by), (roi_x1 + bx + bw, by + bh), (0, 255, 255), 2)
-
-            status = "HEADLINE DETECTED" if headline_crop is not None else "monitoring..."
+            status = f"HEADLINE ({headline_color})" if headline_crop is not None else "monitoring..."
             cv2.putText(display, status, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8,
                         (0, 255, 255) if headline_crop is not None else (200, 200, 200), 2)
             cv2.putText(display, f"saved: {count}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
@@ -171,7 +171,7 @@ def main():
         if dedup.is_same_image(headline_crop):
             continue
 
-        print(f"\n[偵測] {datetime.now().strftime('%H:%M:%S')} 發現黃色頭條，進行 OCR...")
+        print(f"\n[偵測] {datetime.now().strftime('%H:%M:%S')} 發現{headline_color}頭條，進行 OCR...")
 
         ocr_text = ocr_headline(headline_crop)
         if not ocr_text:

@@ -7,22 +7,35 @@ STREAM_QUALITY = "720p"  # 串流畫質
 # 取樣間隔（秒）
 SAMPLE_INTERVAL = 1.5
 
-# ROI：裁切右半畫面（比例）
-ROI_X_START = 0.5   # 從畫面 50% 開始
-ROI_X_END = 1.0     # 到畫面 100%
-ROI_Y_START = 0.0
-ROI_Y_END = 1.0
+# 頭條區塊位置（佔整個畫面的比例，從範例圖片測量）
+HEADLINE_X_START = 0.53
+HEADLINE_X_END = 0.91
+HEADLINE_Y_START = 0.38
+HEADLINE_Y_END = 0.55
 
-# HSV 黃色閾值
+# 頭條顏色 HSV 閾值（任一命中即視為頭條）
+# 黃色背景（黑字）
 YELLOW_H_MIN = 10
 YELLOW_H_MAX = 40
 YELLOW_S_MIN = 50
-YELLOW_S_MAX = 255
 YELLOW_V_MIN = 150
-YELLOW_V_MAX = 255
 
-# 黃色區塊面積閾值（佔 ROI 面積的比例）
-MIN_YELLOW_AREA_RATIO = 0.05  # 至少佔 ROI 的 5%
+# 紅色背景（白字）— H 在 0~10 或 160~180
+RED_H_MIN1 = 0
+RED_H_MAX1 = 10
+RED_H_MIN2 = 160
+RED_H_MAX2 = 180
+RED_S_MIN = 80
+RED_V_MIN = 100
+
+# 藍色背景（白字）
+BLUE_H_MIN = 90
+BLUE_H_MAX = 130
+BLUE_S_MIN = 50
+BLUE_V_MIN = 100
+
+# 頭條判定：顏色像素佔裁切區塊的最小比例
+MIN_HEADLINE_RATIO = 0.15
 
 # 去重：SSIM 閾值
 SSIM_THRESHOLD = 0.85  # > 此值視為相同圖片

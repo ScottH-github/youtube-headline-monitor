@@ -1,70 +1,75 @@
-"""黃色區塊偵測模組"""
+"""頭條區塊偵測模組（固定區塊 + 多色判斷）"""
 
 import cv2
 import numpy as np
 import config
 
 
-def crop_roi(frame: np.ndarray) -> np.ndarray:
-    """裁切 ROI 區域（右半畫面）"""
+def crop_headline_region(frame: np.ndarray) -> np.ndarray:
+    """裁切頭條固定區塊"""
     h, w = frame.shape[:2]
-    x1 = int(w * config.ROI_X_START)
-    x2 = int(w * config.ROI_X_END)
-    y1 = int(h * config.ROI_Y_START)
-    y2 = int(h * config.ROI_Y_END)
+    x1 = int(w * config.HEADLINE_X_START)
+    x2 = int(w * config.HEADLINE_X_END)
+    y1 = int(h * config.HEADLINE_Y_START)
+    y2 = int(h * config.HEADLINE_Y_END)
     return frame[y1:y2, x1:x2]
 
 
-def detect_yellow_region(roi: np.ndarray):
+def detect_headline(region: np.ndarray):
     """
-    在 ROI 中偵測黃色大面積區塊。
-    回傳 (黃色區塊截圖, 邊界框座標) 或 (None, None)。
-    邊界框座標為相對於 ROI 的 (x, y, w, h)。
+    判斷裁切區塊內是否有頭條（黃/紅/藍色背景）。
+    回傳 (區塊截圖, 顏色名稱) 或 (None, None)。
     """
-    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-
-    lower_yellow = np.array([config.YELLOW_H_MIN, config.YELLOW_S_MIN, config.YELLOW_V_MIN])
-    upper_yellow = np.array([config.YELLOW_H_MAX, config.YELLOW_S_MAX, config.YELLOW_V_MAX])
-    mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
-
-    # 形態學操作：去雜訊 + 連接相鄰區塊
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 5))
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
+    if region is None or region.size == 0:
         return None, None
 
-    roi_area = roi.shape[0] * roi.shape[1]
-    min_area = roi_area * config.MIN_YELLOW_AREA_RATIO
+    hsv = cv2.cvtColor(region, cv2.COLOR_BGR2HSV)
+    total_pixels = region.shape[0] * region.shape[1]
 
-    # 找最大的黃色區塊
-    largest = max(contours, key=cv2.contourArea)
-    area = cv2.contourArea(largest)
+    # 黃色
+    yellow_mask = cv2.inRange(
+        hsv,
+        np.array([config.YELLOW_H_MIN, config.YELLOW_S_MIN, config.YELLOW_V_MIN]),
+        np.array([config.YELLOW_H_MAX, 255, 255]),
+    )
+    yellow_ratio = cv2.countNonZero(yellow_mask) / total_pixels
 
-    if area < min_area:
-        return None, None
+    # 紅色（兩段 H 範圍）
+    red_mask1 = cv2.inRange(
+        hsv,
+        np.array([config.RED_H_MIN1, config.RED_S_MIN, config.RED_V_MIN]),
+        np.array([config.RED_H_MAX1, 255, 255]),
+    )
+    red_mask2 = cv2.inRange(
+        hsv,
+        np.array([config.RED_H_MIN2, config.RED_S_MIN, config.RED_V_MIN]),
+        np.array([config.RED_H_MAX2, 255, 255]),
+    )
+    red_ratio = (cv2.countNonZero(red_mask1) + cv2.countNonZero(red_mask2)) / total_pixels
 
-    x, y, w, h = cv2.boundingRect(largest)
+    # 藍色
+    blue_mask = cv2.inRange(
+        hsv,
+        np.array([config.BLUE_H_MIN, config.BLUE_S_MIN, config.BLUE_V_MIN]),
+        np.array([config.BLUE_H_MAX, 255, 255]),
+    )
+    blue_ratio = cv2.countNonZero(blue_mask) / total_pixels
 
-    roi_h, roi_w = roi.shape[:2]
+    # 取最高比例的顏色
+    ratios = {"yellow": yellow_ratio, "red": red_ratio, "blue": blue_ratio}
+    best_color = max(ratios, key=ratios.get)
+    best_ratio = ratios[best_color]
 
-    # 寬度必須佔 ROI 寬度的 60% 以上（頭條橫幅是寬條狀）
-    if w < roi_w * 0.6:
-        return None, None
+    if best_ratio >= config.MIN_HEADLINE_RATIO:
+        return region, best_color
 
-    # 頭條位置必須在 ROI 的 30%~80% 範圍內（排除最頂部和最底部）
-    if y < roi_h * 0.25 or y > roi_h * 0.8:
-        return None, None
+    return None, None
 
-    # 稍微擴展邊界框，確保文字不被裁掉
-    pad_x = int(w * 0.02)
-    pad_y = int(h * 0.05)
-    x = max(0, x - pad_x)
-    y = max(0, y - pad_y)
-    w = min(roi.shape[1] - x, w + 2 * pad_x)
-    h = min(roi.shape[0] - y, h + 2 * pad_y)
 
-    headline_crop = roi[y:y+h, x:x+w]
-    return headline_crop, (x, y, w, h)
+# 向後相容：保留舊函式供參考，但不再使用
+def crop_roi(frame: np.ndarray) -> np.ndarray:
+    """裁切 ROI 區域（右半畫面）— 已棄用，改用 crop_headline_region"""
+    h, w = frame.shape[:2]
+    x1 = int(w * config.ROI_X_START) if hasattr(config, 'ROI_X_START') else int(w * 0.5)
+    x2 = int(w * config.ROI_X_END) if hasattr(config, 'ROI_X_END') else w
+    return frame[0:h, x1:x2]
