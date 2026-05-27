@@ -84,6 +84,12 @@ def generate_report(output_path: str = "output/report.html"):
 
     min_text_len = 10
 
+    color_labels = {
+        "yellow": ("黃", "#f0c040", "#000"),
+        "red": ("紅", "#e04040", "#fff"),
+        "blue": ("藍", "#4080e0", "#fff"),
+    }
+
     rows_html = ""
     for r in records:
         frame_b64 = image_to_base64(r["frame_path"], max_width=480, quality=35)
@@ -91,10 +97,17 @@ def generate_report(output_path: str = "output/report.html"):
         text = r['ocr_text']
         is_noise = _is_noise(text, min_text_len)
         noise_cls = ' class="noise"' if is_noise else ''
+        color = r.get("color", "")
+        if color in color_labels:
+            label, bg, fg = color_labels[color]
+            color_html = f'<span class="color-tag" style="background:{bg};color:{fg}">{label}</span>'
+        else:
+            color_html = ""
         rows_html += f"""
         <tr{noise_cls}>
             <td>{r['id']}</td>
             <td class="ts">{r['timestamp']}</td>
+            <td>{color_html}</td>
             <td class="ocr-text">{text}</td>
             <td><img src="{headline_b64}" class="headline-img" onclick="showModal(this.src)"></td>
             <td><img src="{frame_b64}" class="frame-img" onclick="showModal(this.src)"></td>
@@ -121,6 +134,7 @@ def generate_report(output_path: str = "output/report.html"):
     .ocr-text {{ font-size: 16px; max-width: 400px; line-height: 1.5; }}
     .headline-img {{ height: 60px; cursor: pointer; border-radius: 4px; }}
     .frame-img {{ height: 80px; cursor: pointer; border-radius: 4px; }}
+    .color-tag {{ display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-weight: bold; }}
     .modal {{ display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 1000; cursor: pointer; }}
     .modal img {{ max-width: 90%; max-height: 90%; }}
@@ -144,7 +158,7 @@ def generate_report(output_path: str = "output/report.html"):
 </div>
 <input type="text" class="search-box" placeholder="搜尋文字..." oninput="filterRows(this.value)">
 <table>
-<thead><tr><th>#</th><th>時間</th><th>OCR 文字</th><th>頭條截圖</th><th>全幀截圖</th></tr></thead>
+<thead><tr><th>#</th><th>時間</th><th>色</th><th>OCR 文字</th><th>頭條截圖</th><th>全幀截圖</th></tr></thead>
 <tbody id="tbody">{rows_html}
 </tbody>
 </table>

@@ -182,7 +182,7 @@ def main():
             print(f"[去重] 文字重複，跳過: {ocr_text[:40]}...")
             continue
 
-        record_id = store.save(frame, headline_crop, ocr_text)
+        record_id = store.save(frame, headline_crop, ocr_text, headline_color)
         count += 1
         print(f"[儲存] #{record_id} | {ocr_text}")
         last_headline = (ocr_text, store.get_headline_path(record_id))

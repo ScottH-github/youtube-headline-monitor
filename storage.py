@@ -22,13 +22,14 @@ class Storage:
                 timestamp TEXT NOT NULL,
                 ocr_text TEXT NOT NULL,
                 frame_path TEXT NOT NULL,
-                headline_path TEXT NOT NULL
+                headline_path TEXT NOT NULL,
+                color TEXT DEFAULT ''
             )
         """)
         self.conn.commit()
 
-    def save(self, frame: np.ndarray, headline_crop: np.ndarray, ocr_text: str) -> int:
-        """存全幀截圖 + 黃色區塊截圖 + OCR 文字"""
+    def save(self, frame: np.ndarray, headline_crop: np.ndarray, ocr_text: str, color: str = "") -> int:
+        """存全幀截圖 + 頭條區塊截圖 + OCR 文字 + 偵測顏色"""
         ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 
         frame_path = os.path.join(config.FRAMES_DIR, f"frame_{ts}.png")
@@ -38,8 +39,8 @@ class Storage:
         cv2.imwrite(headline_path, headline_crop)
 
         cursor = self.conn.execute(
-            "INSERT INTO headlines (timestamp, ocr_text, frame_path, headline_path) VALUES (?, ?, ?, ?)",
-            (datetime.now().isoformat(), ocr_text, frame_path, headline_path),
+            "INSERT INTO headlines (timestamp, ocr_text, frame_path, headline_path, color) VALUES (?, ?, ?, ?, ?)",
+            (datetime.now().isoformat(), ocr_text, frame_path, headline_path, color),
         )
         self.conn.commit()
         return cursor.lastrowid
@@ -59,7 +60,7 @@ class Storage:
     def get_all_records(self) -> list[dict]:
         """取得所有記錄（供 HTML 報告）"""
         rows = self.conn.execute(
-            "SELECT id, timestamp, ocr_text, frame_path, headline_path FROM headlines ORDER BY id DESC"
+            "SELECT id, timestamp, ocr_text, frame_path, headline_path, color FROM headlines ORDER BY id DESC"
         ).fetchall()
         return [
             {
@@ -68,6 +69,7 @@ class Storage:
                 "ocr_text": r[2],
                 "frame_path": r[3],
                 "headline_path": r[4],
+                "color": r[5] or "",
             }
             for r in rows
         ]
