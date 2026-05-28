@@ -61,6 +61,27 @@ def detect_headline(region: np.ndarray):
     best_ratio = ratios[best_color]
 
     if best_ratio >= config.MIN_HEADLINE_RATIO:
+        # 上下均勻檢查：真正頭條整塊同色，來賓面板只有半邊有色
+        mid = region.shape[0] // 2
+        hsv_top = hsv[:mid, :]
+        hsv_bot = hsv[mid:, :]
+        top_pixels = hsv_top.shape[0] * hsv_top.shape[1]
+        bot_pixels = hsv_bot.shape[0] * hsv_bot.shape[1]
+
+        if best_color == "yellow":
+            top_r = cv2.countNonZero(yellow_mask[:mid, :]) / top_pixels
+            bot_r = cv2.countNonZero(yellow_mask[mid:, :]) / bot_pixels
+        elif best_color == "red":
+            top_r = (cv2.countNonZero(red_mask1[:mid, :]) + cv2.countNonZero(red_mask2[:mid, :])) / top_pixels
+            bot_r = (cv2.countNonZero(red_mask1[mid:, :]) + cv2.countNonZero(red_mask2[mid:, :])) / bot_pixels
+        else:
+            top_r = cv2.countNonZero(blue_mask[:mid, :]) / top_pixels
+            bot_r = cv2.countNonZero(blue_mask[mid:, :]) / bot_pixels
+
+        # 上下兩半都要有至少 15% 的顏色覆蓋，否則判定為半邊標籤
+        if top_r < 0.15 or bot_r < 0.15:
+            return None, None
+
         return region, best_color
 
     return None, None

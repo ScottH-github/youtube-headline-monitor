@@ -62,13 +62,16 @@ def _is_noise(text: str, min_len: int = 10) -> bool:
     if len(text) > 3 and len(digits) / len(text) > 0.5:
         return True
 
-    # 廣告 / 贊助 / 節目宣傳
+    # 廣告 / 贊助 / 節目宣傳 / 產品
     ad_patterns = [
         "贊助播出", "贊助", "廣告", "諮詢專線", "0800", "免費專線",
         "7-ELEVEN", "7-eleven", "統一布丁", "康利舒胃",
         "本節目由", "感謝收看", "精彩內容",
         "萃滴精", "萃精", "葉黃素", "花萃", "潤膚", "轉大人",
         "LINE ID", "line.me",
+        "固力伸", "Panasonic", "panasonic", "返利", "搶購",
+        "訂購專線", "購物滿減", "定期購", "低至", "折扣",
+        "空調", "冷氣", "淨水",
     ]
     if any(p in text for p in ad_patterns):
         return True
@@ -77,7 +80,8 @@ def _is_noise(text: str, min_len: int = 10) -> bool:
     promo_patterns = [
         "頻道", "YouTube", "youtube", "訂閱", "按讚", "分享",
         "小姐不熙娣", "綜合報導", "主播", "記者.*報導",
-        "連線來賓", "分析師",
+        "連線來賓", "分析師", "鎖定CH",
+        "週一.*週五", "下午\\d", "晚間\\d",
     ]
     if any(re.search(p, text) for p in promo_patterns):
         return True
