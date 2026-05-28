@@ -35,7 +35,7 @@ BLUE_S_MIN = 50
 BLUE_V_MIN = 150
 
 # 頭條判定：顏色像素佔裁切區塊的最小比例
-MIN_HEADLINE_RATIO = 0.25
+MIN_HEADLINE_RATIO = 0.40
 
 # 去重：SSIM 閾值
 SSIM_THRESHOLD = 0.85  # > 此值視為相同圖片
